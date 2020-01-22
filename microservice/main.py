@@ -86,6 +86,7 @@ class ChargePointManager(cp):
                                'No serial number')
 
         # Accept or reject request based on CP serial number
+        # TODO: Accept or reject based on IP or MAC of CP
         response = requests.post("%s/%s" % (BACKEND_URL, "authorize_cp"),
                                  json={'token': TOKEN,
                                        'cp_id': serial_id})
@@ -136,12 +137,26 @@ class ChargePointManager(cp):
             Message example:
             [2, "12345", "StopTransaction", {"transaction_id": "123", "meterStop": 10, "timestamp":"2019-12-20T00:00:00+00.00"}]
         """
+
+        data = {"amount": meter_stop,  # integer in Wh
+                "datetime": timestamp,
+                "transaction_id": transaction_id,
+                "cp_id": self.id
+                }
+
+        # Publish to IOTA
+        response = requests.get(IOTA_PUBLISHER_URL,
+                                params={"message": json.dumps(data)})
+        response = response.json()
+        mam_address = response['root']
+
         # Save energy consumption information
         response = requests.post("%s/%s" % (BACKEND_URL, "save_cp_energy"),
                                  json={'token': TOKEN,
                                        'datetime': timestamp,
                                        'amount': meter_stop,
-                                       'mam_address': "", #mam_address,
+                                       'cp_id': self.id,
+                                       'mam_address': mam_address,
                                        'transaction_id': transaction_id})
         status = AuthorizationStatus.accepted
 
@@ -158,7 +173,7 @@ class ChargePointManager(cp):
     @on(Action.Heartbeat)
     def on_heartbeat(self):
         return call_result.HeartbeatPayload(
-            current_time=datetime.now().isoformat()
+            current_time=datetime.utcnow().isoformat()
         )
 
 

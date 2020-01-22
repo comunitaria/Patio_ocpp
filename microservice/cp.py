@@ -1,5 +1,6 @@
 import asyncio
 import websockets
+import datetime
 
 from ocpp.v16 import call, ChargePoint as cp
 from ocpp.v16.enums import RegistrationStatus, AuthorizationStatus
@@ -38,13 +39,17 @@ class ChargePoint(cp):
         if response.status ==  RegistrationStatus.accepted:
             print("Connected to central system.")
 
+    async def send_heartbeat(self):
+        request = call.HeartbeatPayload()
+        response = await self.call(request)
+        print("Heartbeat sent")
 
     async def send_start_transaction(self):
         # {"connectorId": 0, "idTag": "ABC123", "meterStart": 10, "timestamp":"2019-12-20T00:00:00+00.00"}
-        await asyncio.sleep(10)
+        await asyncio.sleep(20)
 
         request = call.AuthorizePayload(
-            id_tag="1",
+            id_tag="21",
         )
         response = await self.call(request)
 
@@ -53,9 +58,9 @@ class ChargePoint(cp):
 
         request = call.StartTransactionPayload(
             connector_id=0,
-            id_tag="1",
+            id_tag="21",
             meter_start=0,
-            timestamp="2019-12-20T00:00:00+00:00"
+            timestamp=datetime.datetime.now().isoformat()  #"2019-12-20T00:00:00+00:00"
         )
 
         response = await self.call(request)
@@ -67,11 +72,11 @@ class ChargePoint(cp):
 
     async def send_stop_transaction(self):
         # {"connectorId": 0, "idTag": "ABC123", "meterStart": 10, "timestamp":"2019-12-20T00:00:00+00.00"}
-        await asyncio.sleep(15)        
+        await asyncio.sleep(50)        
         request = call.StopTransactionPayload(
             transaction_id=self.last_transaction_id,
             meter_stop=20,
-            timestamp="2019-12-20T00:30:00+00:00"
+            timestamp=datetime.datetime.now().isoformat()  #"2019-12-20T00:30:00+00:00"
         )
 
         response = await self.call(request)
@@ -96,7 +101,7 @@ async def main():
 
         cp = ChargePoint('serial123', ws)
 
-        await asyncio.gather(cp.start(), cp.send_boot_notification(), cp.send_start_transaction(), cp.send_stop_transaction())
+        await asyncio.gather(cp.start(), cp.send_boot_notification(), cp.send_heartbeat(), cp.send_start_transaction(), cp.send_stop_transaction())
 
 
 if __name__ == '__main__':
