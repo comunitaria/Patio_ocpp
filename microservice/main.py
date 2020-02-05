@@ -200,15 +200,13 @@ class ChargePointManager(cp):
     def on_status_notification(self, connector_id, error_code, status, **kwargs):
         operative_status = "operative"
 
-        if status in [ChargePointStatus.unavailable, ChargePointStatus.faulted]:
-            operative_status = "inoperative"
-
         # Save CP status and error code
         response = requests.post("%s/%s" % (BACKEND_URL, "cp_status_update"),
                                  json={"token": TOKEN,
-                                       "status": operative_status,
+                                       "status": status,
                                        "error_code": error_code,
-                                       "cp_id": self.id})
+                                       "cp_id": self.id,
+                                       "connector_id": connector_id})
 
         return call_result.StatusNotificationPayload()
 
