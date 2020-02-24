@@ -89,7 +89,8 @@ class ChargePointManager(cp):
         # TODO: Accept or reject based on IP or MAC of CP
         response = requests.post("%s/%s" % (BACKEND_URL, "authorize_cp"),
                                  json={'token': TOKEN,
-                                       'cp_id': serial_id})
+                                       'cp_id': self.id #serial_id
+                                       })
         if response.ok and response.json()['status'] == 'ok':
             status = RegistrationStatus.accepted
             self.authorized = True
