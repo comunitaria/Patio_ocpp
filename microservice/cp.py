@@ -8,6 +8,7 @@ from ocpp.routing import on
 from ocpp.v16.enums import Action
 from ocpp.v16 import call, call_result
 
+from . import config
 
 class ChargePoint(cp):
     async def start(self):
@@ -95,13 +96,15 @@ class ChargePoint(cp):
 
 async def main():
     async with websockets.connect(
-        'ws://localhost:9000/serial123',
+        '%s/serial123' % config.CS_URL,
          subprotocols=['ocpp1.6']
     ) as ws:
 
         cp = ChargePoint('serial123', ws)
 
-        await asyncio.gather(cp.start(), cp.send_boot_notification(), cp.send_heartbeat(), cp.send_start_transaction(), cp.send_stop_transaction())
+        await asyncio.gather(cp.start(), cp.send_boot_notification(),
+                             cp.send_heartbeat(), cp.send_start_transaction(),
+                             cp.send_stop_transaction())
 
 
 if __name__ == '__main__':

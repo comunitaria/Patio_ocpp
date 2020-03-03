@@ -21,8 +21,6 @@ def unique_id():
 
 
 class ChargePointManager(cp):
-    authorized = False
-
     async def start(self):
         logging.basicConfig(filename='cp_%s.log' % self.id, filemode='w',
                             level=logging.INFO)
@@ -31,7 +29,8 @@ class ChargePointManager(cp):
         while True:
             messages = requests.get("%s/%s?token=%s&cp_id=%s" % (BACKEND_URL,
                                                                  "messages",
-                                                                 TOKEN, self.id))
+                                                                 TOKEN, self.id)
+                                    )
             messages = messages.json()['messages']
             for message in messages:
                 if message['message'].startswith('remote_start'):
@@ -49,7 +48,8 @@ class ChargePointManager(cp):
             self.logger.info('Msg: %s', message_from_cp)
 
             if message_from_cp[0] == 3:  # CALLRESULT message type
-                # TODO: Check for responses to requests sent by Central System: UnlockConnector, ChangeAvailability, ChangeConfiguration, ClearCache, GetConfiguration, Reset, RemoteStartTransaction
+                # TODO: Check for responses to requests sent by Central System: UnlockConnector,
+                # ChangeAvailability, ChangeConfiguration, ClearCache, GetConfiguration, Reset, RemoteStartTransaction
                 # (currently not being used)
                 action = message_from_cp[2]
                 data = json.loads(message_from_cp[3])
@@ -69,7 +69,7 @@ class ChargePointManager(cp):
                 elif action == Action.RemoteStartTransaction:
                     status = data['status']
                     if status == RemoteStartStopStatus.rejected:
-                        logger.info("Remote start rejected")
+                        self.logger.info("Remote start rejected")
                         # TODO: user should be notified to retry
 
             else:  # CALL message type
@@ -79,7 +79,8 @@ class ChargePointManager(cp):
     def on_boot_notification(self, charge_point_vendor, charge_point_model, **kwargs):
         """
             Message example:
-            [2, "12345", "BootNotification", {"chargePointVendor": "The Mobility House", "chargePointModel": "Optimus", "chargePointSerialNumber": "ABC123"}]
+            [2, "12345", "BootNotification", {"chargePointVendor": "The Mobility House",
+            "chargePointModel": "Optimus", "chargePointSerialNumber": "ABC123"}]
         """
         status = RegistrationStatus.rejected
         serial_id = kwargs.get('charge_point_serial_number',
@@ -93,7 +94,6 @@ class ChargePointManager(cp):
                                        })
         if response.ok and response.json()['status'] == 'ok':
             status = RegistrationStatus.accepted
-            self.authorized = True
 
         return call_result.BootNotificationPayload(
             current_time=datetime.utcnow().isoformat(),
@@ -105,14 +105,17 @@ class ChargePointManager(cp):
         """
             Send remote start transaction to CP
         """
-        msg = Call(str(self._unique_id_generator()), "RemoteStartTransaction", {"idTag":id_tag}) # id tag 20 chars len max
+        msg = Call(str(self._unique_id_generator()),
+                   "RemoteStartTransaction",
+                   {"idTag":id_tag}) # idTag has max len of 20 chars
         return msg
 
     @on(Action.StartTransaction)
     def on_start_transaction(self, connector_id, id_tag, meter_start, timestamp, **kwargs):
         """
             Message example:
-            [2, "12345", "StartTransaction", {"connectorId": 0, "idTag": "ABC123", "meterStart": 10, "timestamp":"2019-12-20T00:00:00+00.00"}]
+            [2, "12345", "StartTransaction", {"connectorId": 0, "idTag": "ABC123",
+             "meterStart": 10, "timestamp":"2019-12-20T00:00:00+00.00"}]
         """
 
         # Query to Supervecina to get a new transaction id for the user
@@ -123,8 +126,8 @@ class ChargePointManager(cp):
         response_json = response.json()
 
         status = AuthorizationStatus.invalid
-        if response.ok and response_json['status'] == 'ok' and self.authorized:
-            # If user is authorized, check if CP was previously authorized
+        if response.ok and response_json['status'] == 'ok':
+            # If user is authorized
             status = AuthorizationStatus.accepted
 
         return call_result.StartTransactionPayload(
@@ -136,10 +139,11 @@ class ChargePointManager(cp):
     def on_stop_transaction(self, meter_stop, timestamp, transaction_id, **kwargs):
         """
             Message example:
-            [2, "12345", "StopTransaction", {"transaction_id": "123", "meterStop": 10, "timestamp":"2019-12-20T00:00:00+00.00"}]
+            [2, "12345", "StopTransaction", {"transaction_id": "123", "meterStop": 10,
+             "timestamp":"2019-12-20T00:00:00+00.00"}]
         """
 
-        data = {"amount": meter_stop,  # integer in Wh
+        data = {"amount": meter_stop,  # Wh amount
                 "datetime": timestamp,
                 "transaction_id": transaction_id,
                 "cp_id": self.id
@@ -189,8 +193,8 @@ class ChargePointManager(cp):
         response_json = response.json()
 
         status = AuthorizationStatus.invalid
-        if response.ok and response_json['status'] == 'ok' and self.authorized:
-            # If user is authorized, check if CP was previously authorized
+        if response.ok and response_json['status'] == 'ok':
+            # If user is authorized
             status = AuthorizationStatus.accepted
 
         return call_result.AuthorizePayload(
@@ -199,8 +203,6 @@ class ChargePointManager(cp):
 
     @on(Action.StatusNotification)
     def on_status_notification(self, connector_id, error_code, status, **kwargs):
-        operative_status = "operative"
-
         # Save CP status and error code
         response = requests.post("%s/%s" % (BACKEND_URL, "cp_status_update"),
                                  json={"token": TOKEN,
